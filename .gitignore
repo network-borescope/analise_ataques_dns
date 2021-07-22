@@ -1,2 +1,5 @@
 __pycache__
 *.txt
+!non_client_list.txt
+!open_dns_list.txt
+!pop_df_lat_lon.txt

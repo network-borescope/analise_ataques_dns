@@ -2,6 +2,8 @@ from sys import argv, exit
 import datetime
 from ip_to_nome_lat_lon import site_from_ip
 
+VERSION = "v1"
+
 arguments = argv[1:]
 
 if len(arguments) == 1:
@@ -20,6 +22,30 @@ def dns_req_eof(last_timedelta, current_timedelta, delta_seconds=30):
     if current_timedelta <= last_timedelta - delta: return False
     
     return True
+
+def get_query(items):
+    n = len(items)
+    i = 7 # indice inicial
+    
+    query_type = None
+    query = None
+    while i < n:
+        if len(items[i]) > 0 and items[i][-1] == "?": # query type
+            query_type = items[i]
+
+            i += 1
+            if not i < n: return None
+
+            if len(items[i]) > 0 and items[i][-1] == ".": # query termina com "."
+                query = items[i][:-1] # remove o ponto
+
+                return query
+            
+            return None
+        
+        i += 1
+    
+    return None
 
 open_dns = {}
 with open("open_dns_list.txt", "r") as f:
@@ -64,7 +90,7 @@ fin = open(filename, "r")
 
 filename = filename.split(".")[0]
 
-f_resp = open(f"{filename}_resp_sem_req.txt", "w")
+f_resp = open(f"{VERSION}_{filename}_resp_sem_req.txt", "w")
 
 data = []
 # data positions
@@ -176,16 +202,12 @@ for line in fin:
                     if len(items) < 10:# or (items[7] != 'A?' and items[8] != 'A?'):
                         continue
 
-                    pos = 7
-                    flags = items[pos]
-                    if flags[0] != '[':
-                        flags = ""
-                        pos -= 1
-                    query = items[pos+2][:-1]
-
                     if items[6][0] >= '0' and items[6][0] <= '9':
                         query_id = items[6].replace("+", "")
                         query_id = query_id.replace("%", "")
+
+                        query = get_query(items)
+                        if query is None: continue
 
                         dns_count[TOTAL_REQ] += 1
                         
@@ -202,7 +224,7 @@ for line in fin:
                         
                         #key_interna = data[D_SIP]
                         result = site_from_ip(data[D_SIP])
-                        if result[6] == "1": key_interna = f"{ip_src_a[0]}.{ip_src_a[1]}.0.0/16"
+                        if result[6] == "1": key_interna = data[D_SIP]#key_interna = f"{ip_src_a[0]}.{ip_src_a[1]}.0.0/16"
                         else: key_interna = result[0]
 
                         if key_interna not in dns_match_ip:
@@ -220,18 +242,16 @@ for line in fin:
                             dns_match_ip[key_interna]["req_count"] += 1
 
                 elif (data[D_PROTO] + ":" + data[D_SPORT]) == "17:53": # dns response
-                    try:
-                        query_pos = items.index("A?") + 1
-                        query = items[query_pos][:-1] # remove o ponto
-
-                    except ValueError:
-                            continue
+                    
 
                     if items[6][0] >= '0' and items[6][0] <= '9':
                         query_id = items[6].replace("*", "")
                         query_id = query_id.replace("-", "")
                         query_id = query_id.replace("|", "")
                         query_id = query_id.replace("$", "")
+
+                        query = get_query(items)
+                        if query is None: continue
                         
                         key = f"{data[D_DIP]} {port_dst} {data[D_SIP]} {query_id} {query}"
 
@@ -247,7 +267,7 @@ for line in fin:
                         
                         #key_interna = data[D_DIP]
                         result = site_from_ip(data[D_DIP])
-                        if result[6] == "1": key_interna = f"{ip_dst_a[0]}.{ip_dst_a[1]}.0.0/16"
+                        if result[6] == "1": key_interna = data[D_DIP]#key_interna = f"{ip_dst_a[0]}.{ip_dst_a[1]}.0.0/16"
                         else: key_interna = result[0]
 
                         if key_interna in dns_match_ip:
@@ -261,7 +281,7 @@ f_resp.close()
 
 last_hour = hour_to_timedelta(data[D_HORA])
 
-with open(f"{filename}_req_sem_resp.txt", "w") as f:
+with open(f"{VERSION}_{filename}_req_sem_resp.txt", "w") as f:
     for key in dns_match_total:
         dns = dns_match_total[key]
         
@@ -278,7 +298,7 @@ with open(f"{filename}_req_sem_resp.txt", "w") as f:
         elif dns[RESPONSE] is None: # esta no fim do arquivo e nao foi pareado
             dns_count[REQ_EOF] += 1
 
-with open(f"{filename}_estatisca_dns.txt", "w") as fout:
+with open(f"{VERSION}_{filename}_estatisca_dns.txt", "w") as fout:
     print("QTD DE RESPONSES", dns_count[TOTAL_RESP], file=fout)
     print("QTD DE REQUESTS ", dns_count[TOTAL_REQ], file=fout)
     percent = (dns_count[TOTAL_PAIRS]/dns_count[TOTAL_REQ]) * 100
@@ -297,7 +317,7 @@ with open(f"{filename}_estatisca_dns.txt", "w") as fout:
 
     print(f"\nCONVERSA ENTRE SERVIDORES DNS: {dns_count[CONV_ENTRE_SERVIDORES]}", file=fout)
 
-with open(f"{filename}_estatisca_dns_por_ip.txt", "w") as fout:
+with open(f"{VERSION}_{filename}_estatisca_dns_por_ip.txt", "w") as fout:
     for ip,dict_dns in dns_match_ip.items():
     #for ip,dict_dns in sorted(dns_match_ip.items(), key=lambda item: item[1]["req_count"], reverse= True):
         for key in dict_dns:
