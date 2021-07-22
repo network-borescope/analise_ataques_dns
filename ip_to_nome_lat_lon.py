@@ -58,8 +58,8 @@ def load_ips(filename):
 
                 # print(cidr)
 
+load_ips("non_client_list.txt")
 load_ips("pop_df_lat_lon.txt")
-
 #s = site_from_ip("200.130.1.0")
 #print("-------------")
 #print(s)
